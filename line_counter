@@ -1,0 +1,40 @@
+#!/bin/bash
+
+ignore_patterns=()
+if [[ -f ".gitignore" ]]; then
+    while IFS= read -r pattern; do
+        ignore_patterns+=("$pattern")
+    done < ".gitignore"
+fi
+
+all_files=()
+for file in *; do
+    if [[ -e "$file" ]]; then
+        all_files+=("$file")
+    fi
+done
+
+temp_file=$(mktemp)
+
+filtered_files=()
+for file in "${all_files[@]}"; do
+    ignore_match=0
+    for pattern in "${ignore_patterns[@]}"; do
+        if [[ "$file" == $pattern ]]; then
+            ignore_match=1
+            break
+        fi
+    done
+
+    if [[ $ignore_match -eq 0 ]]; then
+        filtered_files+=("$file")
+    fi
+done
+
+for file in "${filtered_files[@]}"; do
+    echo "$file" >> "$temp_file"
+done
+
+cloc --list-file="$temp_file"
+
+exit 0
