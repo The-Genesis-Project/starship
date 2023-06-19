@@ -11,6 +11,7 @@ void printTokens(const std::vector<Token>& tokens);
 
 // Utility functions
 std::string tokenTypeToString(TokenType type);
+std::vector<Token> performLexicalAnalysis(const std::string& sourceCode);
 
 #endif // LEXER_HPP
 

@@ -1,6 +1,10 @@
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "parser.hpp"
+
+#include "../util/globals.hpp"
 
 ASTNode* parseExpression(const std::vector<Token>& tokens, int& current) {
     ASTNode* node = new ASTNode();
@@ -18,6 +22,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, int& current) {
     ++current;
     ++current;
 
+    flushPrint();
     return node;
 }
 
@@ -58,6 +63,8 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current) {
 
         // Print the identifier lexeme
         std::cout << "Identifier Name: " << tokens[current].lexeme << "\n";
+
+        flushPrint();
 
         // Add the identifier as a child of the parameters node
         node->children.push_back(identifierNode);
@@ -115,6 +122,8 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current) {
 ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
     // Print type of current token
     std::cout << "Current token type: " << tokenTypeToString(tokens[current].type) << "\n";
+
+    flushPrint();
 
     // LEFT_PAREN Token
     if (tokens[current].type == TokenType::LEFT_PAREN) {
@@ -260,7 +269,12 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
     return nullptr;
 }
 
-ASTNode* parse(const std::vector<Token>& tokens) {
+ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
+    std::cout << "RUNNING: Starting Parser Analysis\n";
+
+    // Start the timer
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     ASTNode* root = new ASTNode();
     root->type = "Program";
     root->line = 1;
@@ -273,6 +287,15 @@ ASTNode* parse(const std::vector<Token>& tokens) {
         }
         // If the statement is null, we just skip it
     }
+
+    // Stop the timer
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+
+    // Print the elapsed time
+    double seconds = duration / 1e9;  // Convert nanoseconds to seconds
+    flushPrint();
+    std::cout << "DONE: Parser Analysis took " << seconds << " seconds\n";
 
     return root;
 }
@@ -305,5 +328,12 @@ void printAST(const ASTNode* node, int indent) {
         std::string childIndentation = indentation + (isLastChild ? "   " : cornerLine + "  ");
 
         printAST(child, indent + 4);
+    }
+}
+
+void flushPrint() {
+    if (!verboseMode) {
+        // Flush the output
+        std::cout << "\033[1A\033[2K" << std::flush;
     }
 }

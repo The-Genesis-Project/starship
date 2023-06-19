@@ -1,4 +1,3 @@
 fn main(x, y) {
     print("Hello, World");
-    print("Test");
 }

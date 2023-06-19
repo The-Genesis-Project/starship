@@ -1,9 +1,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include "token.hpp"
 #include "lexer.hpp"
+#include "../parser/parser.hpp"
 
 std::vector<Token> lex(const std::string& sourceCode) {
     std::vector<Token> tokens;
@@ -138,5 +140,26 @@ void printTokens(const std::vector<Token>& tokens) {
     for (const Token& token : tokens) {
         std::cout << tokenTypeToString(token.type) << " " << token.lexeme << " " << token.position << "\n";
     }
+}
+
+std::vector<Token> performLexicalAnalysis(const std::string& sourceCode) {
+    std::cout << "RUNNING: Starting Lexical Analysis\n";
+
+    // Start the timer
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    // Perform lexical analysis
+    std::vector<Token> tokens = lex(sourceCode);
+
+    // Stop the timer
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime).count();
+
+    // Print the elapsed time
+    double seconds = duration / 1e9;  // Convert nanoseconds to seconds
+    flushPrint();
+    std::cout << "DONE: Lexical Analysis took " << seconds << " seconds\n";
+
+    return tokens;
 }
 
