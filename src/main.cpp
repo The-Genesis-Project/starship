@@ -4,6 +4,8 @@
 #include <cstdlib>
 
 #include "lexer/lexer.hpp"
+#include "parser/parser.hpp"
+#include "link/codegen.hpp"
 
 void printUsage() {
     std::cout << "Usage: starship [options] <input-file>\n";
@@ -38,15 +40,29 @@ int main(int argc, char* argv[]) {
     std::string sourceCode((std::istreambuf_iterator<char>(inputFile)),
                            std::istreambuf_iterator<char>());
 
-    std::cout << "Source code:\n";
+    std::cout << "Source code:\n\n";
     printf("%s", sourceCode.c_str());
+    std::cout << "\n\n";
 
     // Lexical analysis
     std::vector<Token> tokens = lex(sourceCode);
 
     // Print tokens
-    std::cout << "Tokens:\n";
+    std::cout << "Tokens:\n\n";
     printTokens(tokens);
+    std::cout << "\n\n";
+
+    // Parsing analysis
+    ASTNode* ast = parse(tokens);
+
+    std::cout << "\nAST:\n";
+    printAST(ast, 0);
+
+    // Start LLVM IR Generation
+
+
+    // Free memory
+    delete ast;
 
     return 0;
 }

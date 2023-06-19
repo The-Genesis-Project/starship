@@ -8,13 +8,15 @@ enum class TokenType {
     // Single-character tokens
     LEFT_PAREN, RIGHT_PAREN,
     LEFT_BRACE, RIGHT_BRACE,
-    COMMA, DOT, SEMICOLON,
+    COMMA, SEMICOLON,
 
     // Keywords
-    FN, CONST, LET, PRINT,
+    FN, PRINT,
 
     // Literals
-    IDENTIFIER, STRING,
+    INT, // U64
+    FLOAT, // F64
+    STRING, // String
 
     // End-of-file
     END_OF_FILE
@@ -22,7 +24,7 @@ enum class TokenType {
 
 struct Token {
     TokenType type;
-    std::string lexeme;
+    std::string lexeme; // This is basically the name.
     std::size_t position;
 
     Token(TokenType type, const std::string& lexeme, std::size_t position)

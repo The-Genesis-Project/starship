@@ -8,3 +8,6 @@ cmake ..
 make
 
 mv starship ../test
+
+cd ../test
+./starship main.rk

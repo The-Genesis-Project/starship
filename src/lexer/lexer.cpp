@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
 #include "token.hpp"
 #include "lexer.hpp"
 
@@ -15,14 +16,32 @@ std::vector<Token> lex(const std::string& sourceCode) {
 
         // Handle single-character tokens
         switch (currentChar) {
-            case '(': tokens.emplace_back(TokenType::LEFT_PAREN, "(", line); break;
-            case ')': tokens.emplace_back(TokenType::RIGHT_PAREN, ")", line); break;
-            case '{': tokens.emplace_back(TokenType::LEFT_BRACE, "{", line); break;
-            case '}': tokens.emplace_back(TokenType::RIGHT_BRACE, "}", line); break;
-            case ',': tokens.emplace_back(TokenType::COMMA, ",", line); break;
-            case '.': tokens.emplace_back(TokenType::DOT, ".", line); break;
-            case ';': tokens.emplace_back(TokenType::SEMICOLON, ";", line); break;
+            case '(':
+                tokens.emplace_back(TokenType::LEFT_PAREN, "(", line);
+                position++;
+                continue;
+            case ')':
+                tokens.emplace_back(TokenType::RIGHT_PAREN, ")", line);
+                position++;
+                continue;
+            case '{':
+                tokens.emplace_back(TokenType::LEFT_BRACE, "{", line);
+                position++;
+                continue;
+            case '}':
+                tokens.emplace_back(TokenType::RIGHT_BRACE, "}", line);
+                position++;
+                continue;
+            case ',':
+                tokens.emplace_back(TokenType::COMMA, ",", line);
+                position++;
+                continue;
+            case ';':
+                tokens.emplace_back(TokenType::SEMICOLON, ";", line);
+                position++;
+                continue;
         }
+
 
         // Handle whitespace
         if (currentChar == ' ' || currentChar == '\t' || currentChar == '\r') {
@@ -47,14 +66,10 @@ std::vector<Token> lex(const std::string& sourceCode) {
             TokenType type;
             if (lexeme == "fn") {
                 type = TokenType::FN;
-            } else if (lexeme == "const") {
-                type = TokenType::CONST;
-            } else if (lexeme == "let") {
-                type = TokenType::LET;
             } else if (lexeme == "print") {
                 type = TokenType::PRINT;
             } else {
-                type = TokenType::IDENTIFIER;
+                type = TokenType::FLOAT;
             }
             tokens.emplace_back(type, lexeme, line);
             continue;
@@ -86,61 +101,42 @@ std::vector<Token> lex(const std::string& sourceCode) {
     return tokens;
 }
 
-std::ostream& operator<<(std::ostream& os, const TokenType& tokenType) {
-    switch (tokenType) {
+std::string tokenTypeToString(TokenType type) {
+    switch (type) {
         case TokenType::LEFT_PAREN:
-            os << "LEFT_PAREN";
-            break;
+            return "LEFT_PAREN";
         case TokenType::RIGHT_PAREN:
-            os << "RIGHT_PAREN";
-            break;
+            return "RIGHT_PAREN";
         case TokenType::LEFT_BRACE:
-            os << "LEFT_BRACE";
-            break;
+            return "LEFT_BRACE";
         case TokenType::RIGHT_BRACE:
-            os << "RIGHT_BRACE";
-            break;
+            return "RIGHT_BRACE";
         case TokenType::COMMA:
-            os << "COMMA";
-            break;
-        case TokenType::DOT:
-            os << "DOT";
-            break;
+            return "COMMA";
         case TokenType::SEMICOLON:
-            os << "SEMICOLON";
-            break;
+            return "SEMICOLON";
         case TokenType::FN:
-            os << "FN";
-            break;
-        case TokenType::CONST:
-            os << "CONST";
-            break;
-        case TokenType::LET:
-            os << "LET";
-            break;
+            return "FN";
         case TokenType::PRINT:
-            os << "PRINT";
-            break;
-        case TokenType::IDENTIFIER:
-            os << "IDENTIFIER";
-            break;
-        case TokenType::STRING:
-            os << "STRING";
-            break;
-        case TokenType::END_OF_FILE:
-            os << "END_OF_FILE";
-            break;
-        default:
-            os << "UNKNOWN";
-            break;
-    }
-    return os;
-}
+            return "PRINT";
 
+        case TokenType::INT:
+            return "INT";
+        case TokenType::FLOAT:
+            return "FLOAT";
+        case TokenType::STRING:
+            return "STRING";
+
+        case TokenType::END_OF_FILE:
+            return "END_OF_FILE";
+    }
+
+    return "";
+}
 
 void printTokens(const std::vector<Token>& tokens) {
     for (const Token& token : tokens) {
-        std::cout << "[" << token.type << ", \"" << token.lexeme << "\", " << token.position << "]\n";
+        std::cout << tokenTypeToString(token.type) << " " << token.lexeme << " " << token.position << "\n";
     }
 }
 

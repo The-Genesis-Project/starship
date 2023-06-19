@@ -1,8 +1,7 @@
 #ifndef CODEGEN_HPP
 #define CODEGEN_HPP
 
-#include "../astgen/astgen.hpp"
-
+#include "../parser/parser.hpp"
 
 #endif // CODEGEN_HPP
 

@@ -1,4 +1,4 @@
-fn main() {
-    print("Hello, World!");
+fn main(x, y) {
+    print("Hello, World");
+    print("Test");
 }
-
