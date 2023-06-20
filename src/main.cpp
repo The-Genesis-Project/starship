@@ -110,8 +110,30 @@ int main(int argc, char* argv[]) {
             printAST(ast, 0);
         }
 
+        // Code generation
+        llvm::LLVMContext context;
+        llvm::Module module("main.rk", context);  
+
+        CodeGenerator codeGenerator(module);
+        codeGenerator.generateIR(ast);
+
         // Clean up
         delete ast;
+
+        std::string llcCommand = "llc -filetype=obj output.ll";
+        int llcResult = std::system(llcCommand.c_str());
+        if (llcResult != 0) {
+            std::cerr << "Error: Failed to generate object code using llc\n";
+            return 1;
+        }
+
+        // Run g++ to link the object code and create the executable
+        std::string gppCommand = "g++ output.o -o" + outputFilename;
+        int gppResult = std::system(gppCommand.c_str());
+        if (gppResult != 0) {
+            std::cerr << "Error: Failed to link object code using g++\n";
+            return 1;
+        }
 
         std::cout << "\nSuccessfully built: " << outputFilename << "\n";
 
