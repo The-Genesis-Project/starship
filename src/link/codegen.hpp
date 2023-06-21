@@ -6,6 +6,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
+
+#include <utility>
 
 #include "../parser/parser.hpp"
 #include "../util/globals.hpp"

@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
         // Clean up
         delete ast;
 
-        std::string llcCommand = "llc -filetype=obj output.ll";
+        std::string llcCommand = "llc -filetype=obj -relocation-model=pic output.ll";
         int llcResult = std::system(llcCommand.c_str());
         if (llcResult != 0) {
             std::cerr << "Error: Failed to generate object code using llc\n";
@@ -133,6 +133,17 @@ int main(int argc, char* argv[]) {
         if (gppResult != 0) {
             std::cerr << "Error: Failed to link object code using g++\n";
             return 1;
+        }
+
+        // Remove the temporary files
+        if (!debugMode)
+        {
+            std::string rmCommand = "rm output.ll output.o";
+            int rmResult = std::system(rmCommand.c_str());
+            if (rmResult != 0) {
+                std::cerr << "Error: Failed to remove temporary files\n";
+                return 1;
+            }
         }
 
         std::cout << "\nSuccessfully built: " << outputFilename << "\n";
