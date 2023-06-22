@@ -57,7 +57,6 @@ void CodeGenerator::generateIR(ASTNode* rootNode) {
 
     // Print the elapsed time
     double seconds = duration / 1e9;  // Convert nanoseconds to seconds
-    flushPrint();
     std::cout << "DONE: IR Generation took " << seconds << " seconds\n";
 }
 
@@ -69,8 +68,17 @@ llvm::Value* CodeGenerator::generateExpressionIR(ASTNode* expressionNode) {
 llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNode) {
     std::vector<llvm::Type*> argTypes;
 
+    // Last child is the return type
+    std::string functionReturnType = functionNode->children[0]->children.back()->lexeme;
+
     // Collect argument types
-    for (ASTNode* parameter : functionNode->children[0]->children) {
+    // For all children except the last one
+    debugPrint("Visiting " + std::to_string(functionNode->children[0]->children.size() - 1) + " parameters\n");
+
+    for (int i = 0; i < functionNode->children[0]->children.size() - 1; i++) {
+        ASTNode* parameter = functionNode->children[0]->children[i];
+
+        debugPrint("Visiting parameter " + parameter->lexeme + "\n");
 
         // Check if nullptr
         if (parameter == nullptr) {
@@ -79,23 +87,57 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
             }
             continue;
         }
-
-        // Print the type of parameter
-        std::cout << "Visiting " << parameter->type << "\n";
         
-        // Assuming all parameters are of type `i32`
-        argTypes.push_back(llvm::Type::getInt32Ty(context));
+        // Parse out the type of the parameter
+        std::string parameterType = parameter->children[0]->lexeme;
+        
+        llvm::Type* llvmType;
+
+        if (parameterType == "int") {
+            llvmType = llvm::Type::getInt32Ty(context);
+        } else if (parameterType == "string") {
+            llvmType = llvm::Type::getInt8PtrTy(context);
+        } else {
+            std::cerr << "ERROR: Invalid parameter type " << parameterType << "\n";
+            continue;
+        }
+
+        // Add the type to the list of argument types
+        argTypes.push_back(llvmType);
 
         if (!debugMode)
         {
             flushPrint();
         }
+
+        // Debugprint "done visiting parameter"
+        debugPrint("Done visiting parameter" + parameter->lexeme + "\n");
     }
 
     debugPrint("Creating function type\n");
     // Create function type
-    // make the return type `i32` 0
-    llvm::FunctionType* functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), argTypes, false);
+    // Switch through the return type to the llvm return type
+    llvm::Type* llvmReturnType;
+
+    // Print the return type
+    debugPrint("Return type: " + functionReturnType + "\n");
+
+    if (functionReturnType == "INT") {
+        llvmReturnType = llvm::Type::getInt32Ty(context);
+    } else if (functionReturnType == "STRING") {
+        // Parse the return size of the string to correctly get the type
+        std::cout << "String size: " << functionNode->children[1]->children.back()->children[0]->lexeme << "\n";
+        int stringSize = functionNode->children[1]->children.back()->children[0]->lexeme.length() + 1;
+
+        llvmReturnType = llvm::Type::getInt8Ty(context);
+        llvmReturnType = llvm::ArrayType::get(llvmReturnType, stringSize);
+        llvmReturnType = llvm::PointerType::get(llvmReturnType, 0);
+    } else {
+        std::cerr << "ERROR: Invalid return type \"" << functionReturnType << "\"\n";
+        exit(1);
+    }
+
+    llvm::FunctionType* functionType = llvm::FunctionType::get(llvmReturnType, argTypes, false);
 
     debugPrint("Creating function\n");
     // Create the function
@@ -138,9 +180,27 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
     // TODO: Figure out why and remove it
    llvm::IRBuilder<> builder(entryBlock);
 
-    // Create a return instruction
-    builder.CreateRet(llvm::ConstantInt::get(context, llvm::APInt(32, 0)));
+    // As before, switch through the return type to the llvm return type
+    llvm::Type* llvmFunctionReturnType;
+    std::string functionBottomReturnType = functionNode->children.back()->children.back()->children[0]->type;
 
+    auto returnValue = functionNode->children.back()->children.back()->children[0]->lexeme;
+    llvm::Value* returnPointer;
+
+    // Create a switch statement to handle different return types
+    if (functionBottomReturnType == "INT") {
+        returnPointer = llvm::ConstantInt::get(context, llvm::APInt(32, std::stoi(returnValue), true));
+    } else if (functionBottomReturnType == "STRING") {
+        llvm::Value* stringConstant = createStringConstant(returnValue);
+        returnPointer = stringConstant;
+    } else {
+        // Handle other return types or error case
+        std::cerr << "Unsupported return type: " << functionBottomReturnType << "\n";
+        exit(1);
+    }
+
+    // Create the return instruction
+    builder.CreateRet(returnPointer);
 
     // Verify the function
     debugPrint("Verifying function\n");
@@ -206,7 +266,6 @@ llvm::Value* CodeGenerator::generatePrintStatementIR(ASTNode* printNode) {
 
     return nullptr;
 }
-
 
 llvm::Value* CodeGenerator::createStringConstant(const std::string& value) {
     llvm::IRBuilder<> builder(context);

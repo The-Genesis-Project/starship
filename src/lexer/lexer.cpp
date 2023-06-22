@@ -16,6 +16,9 @@ std::vector<Token> lex(const std::string& sourceCode) {
     while (position < sourceCode.size()) {
         char currentChar = sourceCode[position];
 
+        // Print the current character
+        // std::cout << "Current character: " << currentChar << "\n";
+
         // Handle single-character tokens
         switch (currentChar) {
             case '(':
@@ -42,8 +45,29 @@ std::vector<Token> lex(const std::string& sourceCode) {
                 tokens.emplace_back(TokenType::SEMICOLON, ";", line);
                 position++;
                 continue;
+            case ':':
+                tokens.emplace_back(TokenType::COLON, ":", line);
+                position++;
+                continue;
+
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9': {
+                std::size_t numericStart = position;
+                while (position < sourceCode.size() && isdigit(sourceCode[position])) {
+                    position++;
+                }
+                std::string lexeme = sourceCode.substr(numericStart, position - numericStart);
+                tokens.emplace_back(TokenType::INT, lexeme, line);
+                continue;
+            }
         }
 
+        // Handle two-character tokens
+        if (currentChar == '-' && position + 1 < sourceCode.size() && sourceCode[position + 1] == '>') {
+            tokens.emplace_back(TokenType::ARROW, "->", line);
+            position += 2;
+            continue;
+        }
 
         // Handle whitespace
         if (currentChar == ' ' || currentChar == '\t' || currentChar == '\r') {
@@ -70,6 +94,12 @@ std::vector<Token> lex(const std::string& sourceCode) {
                 type = TokenType::FN;
             } else if (lexeme == "print") {
                 type = TokenType::PRINT;
+            } else if (lexeme == "return") {
+                type = TokenType::RETURN;
+            } else if (lexeme == "int") {
+                type = TokenType::INT;
+            } else if (lexeme == "string") {
+                type = TokenType::STRING;
             } else {
                 type = TokenType::FLOAT;
             }
@@ -93,10 +123,11 @@ std::vector<Token> lex(const std::string& sourceCode) {
             position++;
             continue;
         }
+        
 
         // Handle unrecognized characters
         std::cerr << "Unrecognized character '" << currentChar << "' at line " << line << "\n";
-        break;
+        exit(1);
     }
 
     tokens.emplace_back(TokenType::END_OF_FILE, "", line);
@@ -121,6 +152,10 @@ std::string tokenTypeToString(TokenType type) {
             return "FN";
         case TokenType::PRINT:
             return "PRINT";
+        case TokenType::ARROW:
+            return "ARROW";
+        case TokenType::COLON:
+            return "COLON";
 
         case TokenType::INT:
             return "INT";
@@ -131,6 +166,9 @@ std::string tokenTypeToString(TokenType type) {
 
         case TokenType::END_OF_FILE:
             return "END_OF_FILE";
+        case TokenType::RETURN:
+            return "RETURN";
+
     }
 
     return "";

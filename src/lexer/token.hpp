@@ -8,7 +8,10 @@ enum class TokenType {
     // Single-character tokens
     LEFT_PAREN, RIGHT_PAREN,
     LEFT_BRACE, RIGHT_BRACE,
-    COMMA, SEMICOLON,
+    COMMA, SEMICOLON, COLON,
+
+    // Two-character tokens
+    ARROW, // ->
 
     // Keywords
     FN, PRINT,
@@ -19,7 +22,8 @@ enum class TokenType {
     STRING, // String
 
     // End-of-file
-    END_OF_FILE
+    END_OF_FILE,
+    RETURN
 };
 
 struct Token {

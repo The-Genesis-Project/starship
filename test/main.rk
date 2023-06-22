@@ -1,4 +1,8 @@
-fn main() {
+fn main(x: int, y: int) -> string {
     print("Hello, World\n");
-    print("test");
+    return "test";
+}
+
+fn newline() -> string {
+    return "\n";
 }

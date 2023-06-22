@@ -22,6 +22,7 @@ void printUsage() {
     std::cout << "    -d / --debug     Prints extra debug messages\n";
     std::cout << "    -v / --verbose   Prints extra build messages\n";
     std::cout << "    Example usage, either -dv or -d -v, both work\n";
+    std::cout << "  debug       A general debug tool for testing...\n";
 }
 
 void printVersion() {
@@ -102,6 +103,14 @@ int main(int argc, char* argv[]) {
         // Lexical analysis
         std::vector<Token> tokens = performLexicalAnalysis(sourceCode);
 
+        if (debugMode) {
+            // Print tokens with all information
+            std::cout << "Tokens:\n";
+            for (Token token : tokens) {
+                std::cout << "[" << tokenTypeToString(token.type) << "] " << token.lexeme << "\n";
+            }
+        }
+
         // Parsing analysis
         ASTNode* ast = performParserAnalysis(tokens);
 
@@ -157,10 +166,45 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // Debugging mode
+    if (inputFilename == "debug") {
+        debugMode = true;
+        verboseMode = true;
+        
+        // Source code
+        std::string sourceFilename = "main.rk";
+        std::ifstream sourceFile(sourceFilename);
+
+        if (!sourceFile) {
+            std::cerr << "Failed to open input file: " << sourceFilename << "\n";
+            return 1;
+        }
+
+        // Read the source code
+        std::string sourceCode((std::istreambuf_iterator<char>(sourceFile)),
+                               std::istreambuf_iterator<char>());
+
+        // Lexical analysis
+        std::vector<Token> tokens = performLexicalAnalysis(sourceCode);
+
+        // Print tokens with all information
+        std::cout << "Tokens:\n";
+        for (Token token : tokens) {
+            std::cout << "[" << tokenTypeToString(token.type) << "] " << token.lexeme << "\n";
+        }
+
+        // Parsing analysis
+        ASTNode* ast = performParserAnalysis(tokens);
+
+        printAST(ast, 0);
+
+        return 0;
+    }
+
     // Normal execution
     std::ifstream inputFile(inputFilename);
     if (!inputFile) {
-        std::cerr << "Failed to open input file: " << inputFilename << "\n";
+        std::cerr << "Not a valid tool " << inputFilename << "\n";
         return 1;
     }
 
