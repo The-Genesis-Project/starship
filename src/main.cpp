@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdlib>
 #include <chrono>
+#include <filesystem>
 
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
@@ -90,7 +91,8 @@ int main(int argc, char* argv[]) {
         std::ifstream sourceFile(sourceFilename);
 
         if (!sourceFile) {
-            std::cerr << "Failed to open input file: " << sourceFilename << "\n";
+            std::cout << "Error: Build Directory must contain a file named main.rk\n";
+            std::cout << "I am in the directory: " << std::filesystem::current_path() << "\n";
             return 1;
         }
 
@@ -176,7 +178,7 @@ int main(int argc, char* argv[]) {
         std::ifstream sourceFile(sourceFilename);
 
         if (!sourceFile) {
-            std::cerr << "Failed to open input file: " << sourceFilename << "\n";
+            std::cout << "Error: Build Directory must contain a file named main.rk\n";
             return 1;
         }
 
@@ -189,13 +191,12 @@ int main(int argc, char* argv[]) {
 
         // Print tokens with all information
         std::cout << "Tokens:\n";
-        for (Token token : tokens) {
+        for (const Token& token : tokens) {
             std::cout << "[" << tokenTypeToString(token.type) << "] " << token.lexeme << "\n";
         }
 
         // Parsing analysis
         ASTNode* ast = performParserAnalysis(tokens);
-
         printAST(ast, 0);
 
         return 0;

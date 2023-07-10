@@ -21,7 +21,7 @@ public:
     void generateIR(ASTNode* rootNode);
 
 private:
-    llvm::Value* generateExpressionIR(ASTNode* expressionNode);
+    static llvm::Value* generateExpressionIR(ASTNode* expressionNode);
     llvm::Function* generateFunctionDeclarationIR(ASTNode* functionNode);
     llvm::Value* generatePrintStatementIR(ASTNode* printNode);
 

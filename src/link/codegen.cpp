@@ -80,14 +80,6 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
 
         debugPrint("Visiting parameter " + parameter->lexeme + "\n");
 
-        // Check if nullptr
-        if (parameter == nullptr) {
-            if (debugMode) {
-                std::cerr << "ERROR: Parameter is nullptr\n";
-            }
-            continue;
-        }
-        
         // Parse out the type of the parameter
         std::string parameterType = parameter->children[0]->lexeme;
         

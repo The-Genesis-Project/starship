@@ -10,11 +10,30 @@ struct ASTNode {
     std::vector<ASTNode*> children;
 };
 
+// Base class for variables
+struct VariableBase {
+    std::string name;
+    TokenType type;
+    bool used;
+    virtual ~VariableBase() = default;
+};
+
+template <typename T>
+struct Variable : public VariableBase {
+    T value;
+};
+
+struct Function {
+    std::string name;
+    TokenType returnType;
+
+};
+
 ASTNode* performParserAnalysis(const std::vector<Token>& tokens);
 
 ASTNode* parseStatement(const std::vector<Token>& tokens, int& current);
+ASTNode* calculateExpression(const std::vector<Token>& tokens, int& current);
 ASTNode* parseFunction(const std::vector<Token>& tokens, int& current);
-ASTNode* parseExpression(const std::vector<Token>& tokens, int& current);
 ASTNode* parseParameters(const std::vector<Token>& tokens, int& current);
 
 void printAST(const ASTNode* node, int indent);

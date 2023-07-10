@@ -1,34 +1,225 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <stack>
 
 #include "parser.hpp"
 
 #include "../util/globals.hpp"
 
-ASTNode* parseExpression(const std::vector<Token>& tokens, int& current) {
-    ASTNode* node = new ASTNode();
-    node->type = "String";
+// Global Lists
+std::vector<std::unique_ptr<VariableBase>> variables;
+
+// Global Functions
+
+// Helper functions
+
+// Check if a string is in regulation with the variable naming rules
+bool validStringName(std::string& name) {
+if (name.size() > 0) {
+        if (name[0] >= '0' && name[0] <= '9') {
+            return false;
+        } else {
+            for (char c : name) {
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || c == '_')) {
+                    return false;
+                }
+            }
+        }
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+bool isTypeToken(TokenType type) {
+    return type == TokenType::INT || type == TokenType::STRING || type == TokenType::FLOAT;
+}
+
+bool isOperator(TokenType type) {
+    return type == TokenType::PLUS || type == TokenType::MINUS || type == TokenType::STAR || type == TokenType::SLASH;
+}
+
+// Check if the operator on top of the stack has higher precedence than the current operator
+bool hasHigherPrecedence(TokenType op1, TokenType op2) {
+    if (op1 == TokenType::STAR || op1 == TokenType::SLASH) {
+        return true;
+    } else if (op1 == TokenType::PLUS || op1 == TokenType::MINUS) {
+        if (op2 == TokenType::STAR || op2 == TokenType::SLASH) {
+            return false;
+        } else {
+            return true;
+        }
+    } else {
+        return false;
+    }
+}
+
+// Perform an operation on two operands
+Token performOperation(const Token& left_operand, const Token& right_operand, const Token& operator_token) {
+   // Use braced initialization to avoid "narrowing conversion" warnings
+
+    if (operator_token.type == TokenType::PLUS) {
+        return {TokenType::INT, std::to_string(std::stoi(left_operand.lexeme) + std::stoi(right_operand.lexeme)), 0};
+    } else if (operator_token.type == TokenType::MINUS) {
+        return {TokenType::INT, std::to_string(std::stoi(left_operand.lexeme) - std::stoi(right_operand.lexeme)), 0};
+    } else if (operator_token.type == TokenType::STAR) {
+        return {TokenType::INT, std::to_string(std::stoi(left_operand.lexeme) * std::stoi(right_operand.lexeme)), 0};
+    } else if (operator_token.type == TokenType::SLASH) {
+        return {TokenType::INT, std::to_string(std::stoi(left_operand.lexeme) / std::stoi(right_operand.lexeme)), 0};
+    } else {
+        return {TokenType::INT, "0", 0};
+    }
+}
+
+// An actual expression parser
+Token calculateExpression(const std::vector<Token>& expression_tokens) {
+    std::stack<Token> operator_stack;
+    std::stack<Token> operand_stack;
+
+    for (const Token& token : expression_tokens) {
+        if (token.type == TokenType::INT) {
+            operand_stack.push(token);
+        } else if (token.type == TokenType::PLUS || token.type == TokenType::MINUS ||
+                   token.type == TokenType::STAR || token.type == TokenType::SLASH) {
+            while (!operator_stack.empty() && hasHigherPrecedence(operator_stack.top().type, token.type)) {
+                Token operator_token = operator_stack.top();
+                operator_stack.pop();
+
+                Token right_operand = operand_stack.top();
+                operand_stack.pop();
+
+                Token left_operand = operand_stack.top();
+                operand_stack.pop();
+
+                Token result = performOperation(left_operand, right_operand, operator_token);
+                operand_stack.push(result);
+            }
+
+            operator_stack.push(token);
+        }
+    }
+
+    while (!operator_stack.empty()) {
+        Token operator_token = operator_stack.top();
+        operator_stack.pop();
+
+        Token right_operand = operand_stack.top();
+        operand_stack.pop();
+
+        Token left_operand = operand_stack.top();
+        operand_stack.pop();
+
+        Token result = performOperation(left_operand, right_operand, operator_token);
+        operand_stack.push(result);
+    }
+
+    return operand_stack.top();
+}
+
+ASTNode* parseEquation(const std::vector<Token>& tokens, int& current) {
+    auto* node = new ASTNode();
+    node->type = "Equation";
     node->line = tokens[current].position;
 
-    // Consume the LEFT_PAREN token
+    // Variable Name
+    std::string variable_name = tokens[current].lexeme;
+
+    // Read the type of variable this will be. (It's the previous token)
+    TokenType variable_type = tokens[current - 1].type;
+
+    current += 2; // Eat the IDENTIFIER and EQUAL tokens
+
+    // Calculate the value of the expression
+    std::vector<Token> expression_tokens;
+    while (tokens[current].type != TokenType::SEMICOLON) {
+        expression_tokens.push_back(tokens[current]);
+        ++current;
+    }
+
+    Token result = calculateExpression(expression_tokens);
+    // Check if the variable type matches the result type
+    if (variable_type != result.type) {
+        std::cerr << "Type mismatch for variable " << variable_name << " on line " << tokens[current].position << "\n";
+        exit(1);
+    }
+
+    // Create and add the variable to the list.
+    if (variable_type == TokenType::INT) {
+        std::unique_ptr<Variable<int>> variable = std::make_unique<Variable<int>>();
+        variable->name = variable_name;
+        variable->value = std::stoi(result.lexeme);
+        variable->type = TokenType::INT;
+        variables.push_back(std::move(variable));
+    } else {
+        // Impossible, there must be an error
+        std::cerr << "Unknown variable type\n";
+        exit(1);
+    }
+
+    // Consume the semicolon
     ++current;
 
-    // Print the value of the expression
-    std::cout << "Expression value: " << tokens[current].lexeme << "\n";
-    node->lexeme = tokens[current].lexeme;
-
-    // Consume the expression and the RIGHT_PAREN token
-    ++current;
-    ++current;
-
-    flushPrint();
     return node;
+}
+
+// Update existing variables
+ASTNode* updateVariable(const std::vector<Token>& tokens, int& current) {
+    auto* node = new ASTNode();
+    node->type = "Equation";
+    node->line = tokens[current].position;
+
+    // Variable Name
+    std::string variable_name = tokens[current].lexeme;
+
+    // Check if the variable exists
+    bool found = false;
+
+    // TODO: Later add virtual constructor to make the variables more generic
+    VariableBase* varPointer = nullptr;
+
+    for (const auto& variable : variables) {
+        if (variable->name == tokens[current].lexeme) {
+            found = true;
+            // Get pointer
+            varPointer = variable.get();
+            break;
+        }
+    }
+
+    if (!found) {
+        std::cerr << "\033[1;31m" << "Variable " << variable_name << " on line " << tokens[current].position << " does not exist\n" << "\033[0m";
+        exit(1);
+    }
+
+    current += 2; // Eat the IDENTIFIER and EQUAL tokens
+
+    // Read the value of the expression
+    // It might be a literal or a variable
+    std::vector<Token> expression_tokens;
+    while (tokens[current].type != TokenType::SEMICOLON) {
+        expression_tokens.push_back(tokens[current]);
+        ++current;
+    }
+
+    Token result = calculateExpression(expression_tokens);
+
+    // Check if the variable type matches the result type
+    if (varPointer->type != result.type) {
+        std::cerr << "\033[1;31m" << "Type mismatch for variable " << variable_name << " on line " << tokens[current].position << "\n" << "\033[0m";
+        exit(1);
+    }
+
+    // Update the variable
+    dynamic_cast<Variable<int>*>(varPointer)->value = std::stoi(result.lexeme);
+
+    return nullptr;
 }
 
 ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode* functionNode) {
     // Parameters node
-    ASTNode* node = new ASTNode();
+    auto* node = new ASTNode();
     node->type = "Parameters";
     node->lexeme = "";
     node->line = tokens[current].position;
@@ -39,13 +230,13 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode
     // Parse the identifiers inside the parentheses
     while (tokens[current].type != TokenType::RIGHT_PAREN) {
         // Parse the identifier
-        ASTNode* identifierNode = new ASTNode();
+        auto* identifierNode = new ASTNode();
         identifierNode->type = "Variable";
         identifierNode->lexeme = tokens[current].lexeme;
         identifierNode->line = tokens[current].position;
 
         // Check if the identifier is valid
-        if (tokens[current].type != TokenType::FLOAT) {
+        if (tokens[current].type != TokenType::IDENTIFIER) {
             std::cerr << "Expected variable\n";
             exit(1);
         }
@@ -62,7 +253,7 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode
             ++current;
 
             // Parse the type
-            ASTNode* typeNode = new ASTNode();
+            auto* typeNode = new ASTNode();
             typeNode->type = "Type";
             typeNode->lexeme = tokens[current].lexeme;
             typeNode->line = tokens[current].position;
@@ -110,14 +301,13 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode
     return node;
 }
 
-
 ASTNode* parseReturn(const std::vector<Token>& tokens, int& current) {
     // Return node
     ASTNode* node = new ASTNode();
     node->type = "Return";
     node->line = tokens[current].position;
 
-    // For now we assume that the return statement is followed by one expression
+    // For now, we assume that the return statement is followed by one expression
     // Parse the expression and add it as a child of the return node
     // Not using parseExpression() because of custom paren handling
 
@@ -129,9 +319,8 @@ ASTNode* parseReturn(const std::vector<Token>& tokens, int& current) {
         exit(1);
     }
 
-
     // Parse the expression
-    ASTNode* expression = new ASTNode();
+    auto* expression = new ASTNode();
     expression->type = tokenTypeToString(tokens[current].type);
     expression->lexeme = tokens[current].lexeme;
     expression->line = tokens[current].position;
@@ -158,7 +347,7 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNo
     // This will use recursive descent parsing to parse the statements inside the function body
 
     // Function body node
-    ASTNode* node = new ASTNode();
+    auto* node = new ASTNode();
     node->type = "FunctionBody";
     node->line = tokens[current].position;
 
@@ -184,7 +373,7 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNo
             }
 
             // Check that the return statment type matches the function return type
-            // Very ugly, fix later...
+            // TODO: Very ugly, fix later...
             if (returnNode->children[0]->type != functionNode->children[0]->children.back()->lexeme) {
                 std::cerr << "Return type does not match function return type\n";
 
@@ -225,75 +414,37 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
 
     // LEFT_PAREN Token
     if (tokens[current].type == TokenType::LEFT_PAREN) {
-        ASTNode* node = new ASTNode();
-        node->type = "LeftParen";
-        node->lexeme = tokens[current].lexeme;
-        node->line = tokens[current].position;
-        ++current;
-
-        // Parse the expression inside the parentheses
-        node->children.push_back(parseExpression(tokens, current));
-
-        // Expect a right parenthesis
-        if (tokens[current].type != TokenType::RIGHT_PAREN) {
-            std::cerr << "Expected ')' after expression\n";
-            exit(1);
-        }
-
-        // Consume the right parenthesis
-        ++current;
-        // stop the program here for debug
+        // Something is wrong if we get here
+        std::cerr << "Unexpected '('\n";
         exit(1);
-        return node;
     }
 
     // RIGHT_PAREN Token
     if (tokens[current].type == TokenType::RIGHT_PAREN) {
         // Something is wrong if we get here
+        std::cerr << "Unexpected ')'\n";
         exit(1);
     }
 
     // LEFT_BRACE Token
     if (tokens[current].type == TokenType::LEFT_BRACE) {
-        ASTNode* node = new ASTNode();
-        node->type = "LeftBrace";
-        node->lexeme = tokens[current].lexeme;
-        node->line = tokens[current].position;
-        ++current;
-
-        // Parse the expression inside the braces
-        node->children.push_back(parseExpression(tokens, current));
-
-        // Expect a right brace
-        if (tokens[current].type != TokenType::RIGHT_BRACE) {
-            std::cerr << "Expected '}' after expression\n";
-            exit(1);
-        }
-
-        // Consume the right brace
-        ++current;
-
-        return node;
+        // Something is wrong if we get here
+        std::cerr << "Unexpected '{'\n";
+        exit(1);
     }
 
     // RIGHT_BRACE Token
     if (tokens[current].type == TokenType::RIGHT_BRACE) {
         // Something is wrong if we get here
+        std::cerr << "Unexpected '}'\n";
         exit(1);
     }
 
     // COMMA Token
     if (tokens[current].type == TokenType::COMMA) {
-        ASTNode* node = new ASTNode();
-        node->type = "Comma";
-        node->lexeme = tokens[current].lexeme;
-        node->line = tokens[current].position;
-        ++current;
-
-        // Parse the expression after the comma
-        node->children.push_back(parseExpression(tokens, current));
-
-        return node;
+        // Something is wrong if we get here
+        std::cerr << "Unexpected ','\n";
+        exit(1);
     }
 
     // SEMICOLON Token
@@ -304,7 +455,7 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
 
     // FN Token
     if (tokens[current].type == TokenType::FN) {
-        ASTNode* node = new ASTNode();
+        auto* node = new ASTNode();
         node->type = "FunctionDeclaration";
         node->lexeme = tokens[++current].lexeme;
         node->line = tokens[current].position;
@@ -322,43 +473,101 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
 
     // PRINT Token
     if (tokens[current].type == TokenType::PRINT) {
-        ASTNode* node = new ASTNode();
+        auto* node = new ASTNode();
         node->type = "PrintStatement";
         node->lexeme = "";
         node->line = tokens[current].position;
         ++current;
 
-        // Parse the expression inside the print statement
-        node->children.push_back(parseExpression(tokens, current));
+        // Parse the contents of the print statement
+        std::vector<Token> printContents;
+        while (tokens[current].type != TokenType::SEMICOLON) {
+            printContents.push_back(tokens[current++]);
+        }
+
+        // Remove the first and last tokens as they are ( and )
+        printContents.erase(printContents.begin());
+        printContents.pop_back();
+
+        // Check and ground variables.
+        for (auto& token : printContents) {
+            // Check if the token is an operator
+            if (isOperator(token.type)) {
+                continue;
+            }
+
+            // Check if the token is a number or string literal
+            if (token.type == TokenType::INT || token.type == TokenType::STRING) {
+                continue;
+            }
+
+            // Check if the token is a valid variable name
+            std::string variable_name = token.lexeme;
+            if (validStringName(variable_name)) {
+                bool variable_found = false;
+
+                // Check if it's in the variable list
+                for (auto& list_variable : variables) {
+                    if (variable_name == list_variable->name) {
+                        variable_found = true;
+                        list_variable->used = true;
+
+                        // Replace the IDENTIFIER token with the correct node type for the variable
+                        token.type = list_variable->type;
+                        token.lexeme = std::to_string(dynamic_cast<Variable<int>*>(list_variable.get())->value);
+
+                        break;
+                    }
+                }
+
+                if (!variable_found) {
+                    // Variable not found
+                    std::cerr << "Variable not found: " << variable_name << " Line: " << token.position << "\n";
+                }
+            }
+        }
+
+        // Debug print the print contents
+        std::cout << "Print contents: ";
+        for (auto& token : printContents) {
+            std::cout << "(" << token.lexeme << ", " << tokenTypeToString(token.type) << ")";
+        }
+        std::cout << "\n";
+
+        // Calculate the result of the print statement
+        Token printCalculationResult = calculateExpression(printContents);
+
+        auto* printContentsNode = new ASTNode();
+        printContentsNode->type = tokenTypeToString(printCalculationResult.type);
+        printContentsNode->lexeme = printCalculationResult.lexeme;
+        printContentsNode->line = node->line;
+
+        node->children.push_back(printContentsNode);
 
         return node;
     }
 
-    // IDENTIFIER Token
+    // FLOAT Token
     if (tokens[current].type == TokenType::FLOAT) {
-        ASTNode* node = new ASTNode();
-        node->type = "Float";
-        node->lexeme = tokens[current].lexeme;
-        node->line = tokens[current].position;
-        ++current;
+        current++;
+        return nullptr;
+    }
 
-        return node;
+    // INT Token
+    if (tokens[current].type == TokenType::INT) {
+        current++;
+        return nullptr;
     }
 
     // STRING Token
     if (tokens[current].type == TokenType::STRING) {
-        ASTNode* node = new ASTNode();
-        node->type = "String";
-        node->lexeme = tokens[current].lexeme;
-        node->line = tokens[current].position;
-        ++current;
-
-        return node;
+        current++;
+        return nullptr;
     }
 
     // END_OF_FILE Token
     if (tokens[current].type == TokenType::END_OF_FILE) {
-        ++current;
+        current++;
         return nullptr;
     }
 
@@ -367,9 +576,30 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
         return parseReturn(tokens, current);
     }
 
+    // IDENTIFIER Token
+    if (tokens[current].type == TokenType::IDENTIFIER) {
+        // Check if the previous token is a type token. This would mean that this is a variable declaration
+        if(isTypeToken(tokens[current - 1].type)) {
+            return parseEquation(tokens, current);
+        }
+
+        // If there is something else before the identifier, then it's a "variable update"
+        if(!isTypeToken(tokens[current - 1].type)) {
+            return updateVariable(tokens, current);
+        }
+
+        return nullptr;
+    }
+
+    // EQUAL Token
+    if (tokens[current].type == TokenType::EQUAL) {
+        ++current;
+        return nullptr;
+    }
+
     // If we don't recognize the token, return nullptr
     std::cerr << "Unrecognized token type: " << tokenTypeToString(tokens[current].type) << "\n at line: " << tokens[current].position << "\n";
-    return nullptr;
+    exit(1);
 }
 
 ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
@@ -378,7 +608,7 @@ ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
     // Start the timer
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    ASTNode* root = new ASTNode();
+    auto* root = new ASTNode();
     root->type = "Program";
     root->line = 1;
 
@@ -398,7 +628,15 @@ ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
     // Print the elapsed time
     double seconds = duration / 1e9;  // Convert nanoseconds to seconds
     flushPrint();
+    flushPrint();
     std::cout << "DONE: Parser Analysis took " << seconds << " seconds\n";
+
+    // Warn about unused variables
+    for (auto& variable : variables) {
+        if (!variable->used) {
+            std::cerr << "\033[1;31m" << "WARNING: Unused variable: " << variable->name << "\033[0m\n"; // Red
+        }
+    }
 
     return root;
 }

@@ -2,3 +2,5 @@ build
 .vscode
 test/starship
 docs/*
+cmake-build-debug
+.idea

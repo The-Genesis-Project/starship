@@ -1,8 +1,0 @@
-fn main(x: int, y: int) -> string {
-    print("Hello, World\n");
-    return "test";
-}
-
-fn newline() -> string {
-    return "\n";
-}

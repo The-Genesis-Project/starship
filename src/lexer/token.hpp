@@ -10,6 +10,11 @@ enum class TokenType {
     LEFT_BRACE, RIGHT_BRACE,
     COMMA, SEMICOLON, COLON,
 
+    // Expression tokens
+    EQUAL, // =
+    IDENTIFIER, // Variable name
+    PLUS, MINUS, STAR, SLASH, // + - * /
+
     // Two-character tokens
     ARROW, // ->
 
