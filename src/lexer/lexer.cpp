@@ -236,6 +236,54 @@ std::string tokenTypeToString(TokenType type) {
     return "";
 }
 
+TokenType stringToTokenType(std::string toke_string) {
+    if (toke_string == "LEFT_PAREN") {
+        return TokenType::LEFT_PAREN;
+    } else if (toke_string == "RIGHT_PAREN") {
+        return TokenType::RIGHT_PAREN;
+    } else if (toke_string == "LEFT_BRACE") {
+        return TokenType::LEFT_BRACE;
+    } else if (toke_string == "RIGHT_BRACE") {
+        return TokenType::RIGHT_BRACE;
+    } else if (toke_string == "COMMA") {
+        return TokenType::COMMA;
+    } else if (toke_string == "SEMICOLON") {
+        return TokenType::SEMICOLON;
+    } else if (toke_string == "FN") {
+        return TokenType::FN;
+    } else if (toke_string == "PRINT") {
+        return TokenType::PRINT;
+    } else if (toke_string == "ARROW") {
+        return TokenType::ARROW;
+    } else if (toke_string == "COLON") {
+        return TokenType::COLON;
+    } else if (toke_string == "IDENTIFIER") {
+        return TokenType::IDENTIFIER;
+    } else if (toke_string == "EQUAL") {
+        return TokenType::EQUAL;
+    } else if (toke_string == "INT") {
+        return TokenType::INT;
+    } else if (toke_string == "FLOAT") {
+        return TokenType::FLOAT;
+    } else if (toke_string == "STRING") {
+        return TokenType::STRING;
+    } else if (toke_string == "PLUS") {
+        return TokenType::PLUS;
+    } else if (toke_string == "MINUS") {
+        return TokenType::MINUS;
+    } else if (toke_string == "STAR") {
+        return TokenType::STAR;
+    } else if (toke_string == "SLASH") {
+        return TokenType::SLASH;
+    } else if (toke_string == "END_OF_FILE") {
+        return TokenType::END_OF_FILE;
+    } else if (toke_string == "RETURN") {
+        return TokenType::RETURN;
+    } else {
+        return TokenType::END_OF_FILE;
+    }
+}
+
 void printTokens(const std::vector<Token>& tokens) {
     for (const Token& token : tokens) {
         std::cout << tokenTypeToString(token.type) << " " << token.lexeme << " " << token.position << "\n";

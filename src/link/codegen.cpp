@@ -12,7 +12,7 @@ void debugPrint(const std::string& message) {
 CodeGenerator::CodeGenerator(llvm::Module& module)
     : module(module), context(module.getContext()), builder(context) {}
 
-void CodeGenerator::generateIR(ASTNode* rootNode) {
+void CodeGenerator::generateIR(ASTTree* rootNode) {
     std::cout << "RUNNING: Starting IR Generation\n";
 
     // Start the timer
@@ -26,14 +26,16 @@ void CodeGenerator::generateIR(ASTNode* rootNode) {
     // functionPassManager.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
 
     // Visit the root node and generate IR code
-    for (ASTNode* child : rootNode->children) {
+    for (ASTNodeBase* child : rootNode->statements) {
 
         // Print the type of child
-        std::cout << "Visiting " << child->type << "\n";
+        std::cout << "Visiting " << typeid(*child).name() << "\n";
 
+        /*
         if (child->type == "FunctionDeclaration") {
             generateFunctionDeclarationIR(child);
         }
+         */
 
         flushPrint();
     }
@@ -60,37 +62,33 @@ void CodeGenerator::generateIR(ASTNode* rootNode) {
     std::cout << "DONE: IR Generation took " << seconds << " seconds\n";
 }
 
-llvm::Value* CodeGenerator::generateExpressionIR(ASTNode* expressionNode) {
-    // Placeholder implementation for expression generation
-    return nullptr;
-}
-
-llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNode) {
+llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* functionNode) {
     std::vector<llvm::Type*> argTypes;
 
     // Last child is the return type
-    std::string functionReturnType = functionNode->children[0]->children.back()->lexeme;
+    TokenType functionReturnType = functionNode->returnVariable.type;
 
     // Collect argument types
-    // For all children except the last one
-    debugPrint("Visiting " + std::to_string(functionNode->children[0]->children.size() - 1) + " parameters\n");
+    // TODO: I don't like the double parameter thing.
+    debugPrint("Visiting " + std::to_string(functionNode->parameters.parameters.size()) + " parameters\n");
 
-    for (int i = 0; i < functionNode->children[0]->children.size() - 1; i++) {
-        ASTNode* parameter = functionNode->children[0]->children[i];
+    // Goes through each parameter.
+    for (int i = 0; i < functionNode->parameters.parameters.size() - 1; i++) {
+        VariableBase* parameter = functionNode->parameters.parameters[i];
 
-        debugPrint("Visiting parameter " + parameter->lexeme + "\n");
+        debugPrint("Visiting parameter " + parameter->name + "\n");
 
         // Parse out the type of the parameter
-        std::string parameterType = parameter->children[0]->lexeme;
+        TokenType parameterType = parameter->type;
         
         llvm::Type* llvmType;
 
-        if (parameterType == "int") {
+        if (parameterType == TokenType::INT) {
             llvmType = llvm::Type::getInt32Ty(context);
-        } else if (parameterType == "string") {
+        } else if (parameterType == TokenType::STRING) {
             llvmType = llvm::Type::getInt8PtrTy(context);
         } else {
-            std::cerr << "ERROR: Invalid parameter type " << parameterType << "\n";
+            std::cerr << "ERROR: Invalid parameter type " << tokenTypeToString(parameterType) << "\n";
             continue;
         }
 
@@ -102,21 +100,22 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
             flushPrint();
         }
 
-        // Debugprint "done visiting parameter"
-        debugPrint("Done visiting parameter" + parameter->lexeme + "\n");
+        // Debug print "done visiting parameter"
+        debugPrint("Done visiting parameter" + parameter->name + "\n");
     }
 
     debugPrint("Creating function type\n");
+
     // Create function type
     // Switch through the return type to the llvm return type
     llvm::Type* llvmReturnType;
 
     // Print the return type
-    debugPrint("Return type: " + functionReturnType + "\n");
+    debugPrint("Return type: " + tokenTypeToString(functionReturnType) + "\n");
 
-    if (functionReturnType == "INT") {
+    if (functionReturnType == TokenType::INT) {
         llvmReturnType = llvm::Type::getInt32Ty(context);
-    } else if (functionReturnType == "STRING") {
+    } /* else if (functionReturnType == TokenType::STRING) {
         // Parse the return size of the string to correctly get the type
         std::cout << "String size: " << functionNode->children[1]->children.back()->children[0]->lexeme << "\n";
         int stringSize = functionNode->children[1]->children.back()->children[0]->lexeme.length() + 1;
@@ -124,8 +123,8 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
         llvmReturnType = llvm::Type::getInt8Ty(context);
         llvmReturnType = llvm::ArrayType::get(llvmReturnType, stringSize);
         llvmReturnType = llvm::PointerType::get(llvmReturnType, 0);
-    } else {
-        std::cerr << "ERROR: Invalid return type \"" << functionReturnType << "\"\n";
+    } */ else {
+        std::cerr << "ERROR: Invalid return type \"" << tokenTypeToString(functionReturnType) << "\"\n";
         exit(1);
     }
 
@@ -134,7 +133,7 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
     debugPrint("Creating function\n");
     // Create the function
     llvm::Function* function = llvm::Function::Create(
-        functionType, llvm::Function::ExternalLinkage, functionNode->lexeme, &module);
+        functionType, llvm::Function::ExternalLinkage, functionNode->name, &module);
 
     debugPrint("Creating entry block\n");
     // Create a new basic block for the function entry
@@ -147,8 +146,8 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
 
     // Create the function contents
     // Loop through the statements and generate IR for each
-    if (functionNode->children.size() >= 2 && functionNode->children[1] != nullptr) {
-        for (ASTNode* statement : functionNode->children[1]->children) {
+    if (functionNode->body->statements.size() >= 2 && functionNode->body->statements[1] != nullptr) {
+        for (ASTNodeBase* statement : functionNode->body->statements) {
             if (statement == nullptr) {
                 if (debugMode) {
                     std::cerr << "WARNING: Statement is nullptr\n";
@@ -157,16 +156,18 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
             }
 
             // Debug print the statement type and the function name
-            debugPrint("Visiting " + statement->type + " in function " + functionNode->lexeme + "\n");
+            debugPrint("Visiting " + std::string(typeid(*statement).name()) + " in function " + functionNode->name + "\n");
 
+            /*
             if (statement->type == "PrintStatement") {
                 debugPrint("Generating print statement IR\n");
                 generatePrintStatementIR(statement);
             }
+                */
         }
     }
    
-    debugPrint("Creating return instruction for function \"" + functionNode->lexeme + "\"\n");
+    debugPrint("Creating return instruction for function \"" + functionNode->name + "\"\n");
 
     // I don't know why this is needed, but it is, and it fixes the seg fault 
     // TODO: Figure out why and remove it
@@ -174,20 +175,26 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
 
     // As before, switch through the return type to the llvm return type
     llvm::Type* llvmFunctionReturnType;
-    std::string functionBottomReturnType = functionNode->children.back()->children.back()->children[0]->type;
+    TokenType functionBottomReturnType = functionNode->returnVariable.type;
 
-    auto returnValue = functionNode->children.back()->children.back()->children[0]->lexeme;
+    VariableBase returnVariable = functionNode->returnVariable;
     llvm::Value* returnPointer;
 
     // Create a switch statement to handle different return types
-    if (functionBottomReturnType == "INT") {
-        returnPointer = llvm::ConstantInt::get(context, llvm::APInt(32, std::stoi(returnValue), true));
-    } else if (functionBottomReturnType == "STRING") {
+    if (functionBottomReturnType == TokenType::INT) {
+        Variable<int>* intReturnVariable = dynamic_cast<Variable<int>*>(&returnVariable);
+        if (intReturnVariable != nullptr) {
+            int value = intReturnVariable->value;
+            returnPointer = llvm::ConstantInt::get(context, llvm::APInt(32, value, true));
+        }
+    }
+    /*else if (functionBottomReturnType == TokenType::STRING) {
         llvm::Value* stringConstant = createStringConstant(returnValue);
         returnPointer = stringConstant;
-    } else {
+    } */
+    else {
         // Handle other return types or error case
-        std::cerr << "Unsupported return type: " << functionBottomReturnType << "\n";
+        std::cerr << "Unsupported return type: " << tokenTypeToString(functionBottomReturnType) << "\n";
         exit(1);
     }
 
@@ -201,18 +208,34 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(ASTNode* functionNo
     return function;
 }
 
-llvm::Value* CodeGenerator::generatePrintStatementIR(ASTNode* printNode) {
-    std::string printValue = printNode->children[0]->lexeme;
+llvm::Value* CodeGenerator::generatePrintStatementIR(PrintNode* printNode) {
+    VariableBase* printValue = printNode->expression;
+    std::string processedValue;
+
+    // Switch through the different types the print value could be and dynamically cast it
+    switch (printValue->type) {
+        case TokenType::INT: {
+            processedValue = std::to_string(dynamic_cast<Variable<int>*>(printValue)->value);
+        }
+        // Add more later.
+    }
+
+    // Check if processedValue is empty
+    if (processedValue.empty()) {
+        std::cerr << "ERROR: Invalid print value\n";
+        exit(1);
+    }
 
     debugPrint("Creating print statement\n");
 
+    /* This will be used in the string case
     // handle different types of \ characters
     std::string processedValue;
     std::size_t i = 0;
-    while (i < printValue.length()) {
+    while (i < printValue) {
         char c = printValue[i++];
         if (c == '\\') {
-            if (i < printValue.length()) {
+            if (i < printValue.) {
                 char nextChar = printValue[i++];
                 switch (nextChar) {
                     case 'n': processedValue += '\n'; break;
@@ -231,6 +254,7 @@ llvm::Value* CodeGenerator::generatePrintStatementIR(ASTNode* printNode) {
             processedValue += c;
         }
     }
+    */
 
     llvm::Value* stringValue = createStringConstant(processedValue);
 

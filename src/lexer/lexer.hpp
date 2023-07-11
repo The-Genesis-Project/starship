@@ -7,11 +7,12 @@
 
 // Lexical analysis
 std::vector<Token> lex(const std::string& sourceCode);
-void printTokens(const std::vector<Token>& tokens);
+std::vector<Token> performLexicalAnalysis(const std::string& sourceCode);
 
 // Utility functions
 std::string tokenTypeToString(TokenType type);
-std::vector<Token> performLexicalAnalysis(const std::string& sourceCode);
+TokenType stringToTokenType(std::string toke_string);
+void printTokens(const std::vector<Token>& tokens);
 
 #endif // LEXER_HPP
 

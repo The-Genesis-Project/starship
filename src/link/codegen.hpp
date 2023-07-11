@@ -18,12 +18,11 @@
 class CodeGenerator {
 public:
     CodeGenerator(llvm::Module& module);
-    void generateIR(ASTNode* rootNode);
+    void generateIR(ASTTree* rootNode);
 
 private:
-    static llvm::Value* generateExpressionIR(ASTNode* expressionNode);
-    llvm::Function* generateFunctionDeclarationIR(ASTNode* functionNode);
-    llvm::Value* generatePrintStatementIR(ASTNode* printNode);
+    llvm::Function* generateFunctionDeclarationIR(FunctionNode* functionNode);
+    llvm::Value* generatePrintStatementIR(PrintNode* printNode);
 
     llvm::Value* createStringConstant(const std::string& value);
 

@@ -11,7 +11,7 @@
 std::vector<std::unique_ptr<VariableBase>> variables;
 
 // Global Functions
-std::vector<Function> functions;
+std::vector<FunctionNode> functions;
 
 // Helper functions
 
@@ -79,6 +79,10 @@ Token calculateExpression(const std::vector<Token>& expression_tokens) {
     std::stack<Token> operator_stack;
     std::stack<Token> operand_stack;
 
+    if (expression_tokens.size() == 1) {
+        return expression_tokens[0];
+    }
+
     for (const Token& token : expression_tokens) {
         if (token.type == TokenType::INT) {
             operand_stack.push(token);
@@ -119,10 +123,7 @@ Token calculateExpression(const std::vector<Token>& expression_tokens) {
     return operand_stack.top();
 }
 
-ASTNode* parseEquation(const std::vector<Token>& tokens, int& current) {
-    auto* node = new ASTNode();
-    node->type = "Equation";
-    node->line = tokens[current].position;
+VariableBase parseEquation(const std::vector<Token>& tokens, int& current) {
 
     // Variable Name
     std::string variable_name = tokens[current].lexeme;
@@ -146,6 +147,10 @@ ASTNode* parseEquation(const std::vector<Token>& tokens, int& current) {
         exit(1);
     }
 
+
+    // Consume the semicolon
+    ++current;
+
     // Create and add the variable to the list.
     if (variable_type == TokenType::INT) {
         std::unique_ptr<Variable<int>> variable = std::make_unique<Variable<int>>();
@@ -153,23 +158,17 @@ ASTNode* parseEquation(const std::vector<Token>& tokens, int& current) {
         variable->value = std::stoi(result.lexeme);
         variable->type = TokenType::INT;
         variables.push_back(std::move(variable));
+
+        return *variables.back();
     } else {
         // Impossible, there must be an error
         std::cerr << "Unknown variable type\n";
         exit(1);
     }
-
-    // Consume the semicolon
-    ++current;
-
-    return node;
 }
 
 // Update existing variables
-ASTNode* updateVariable(const std::vector<Token>& tokens, int& current) {
-    auto* node = new ASTNode();
-    node->type = "Equation";
-    node->line = tokens[current].position;
+void updateVariable(const std::vector<Token>& tokens, int& current) {
 
     // Variable Name
     std::string variable_name = tokens[current].lexeme;
@@ -214,36 +213,22 @@ ASTNode* updateVariable(const std::vector<Token>& tokens, int& current) {
 
     // Update the variable
     dynamic_cast<Variable<int>*>(varPointer)->value = std::stoi(result.lexeme);
-
-    return nullptr;
 }
 
-ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode* functionNode) {
+ParameterNode* parseParameters(const std::vector<Token>& tokens, int& current) {
     // Parameters node
-    auto* node = new ASTNode();
-    node->type = "Parameters";
-    node->lexeme = "";
-    node->line = tokens[current].position;
+    auto* node = new ParameterNode();
 
     // Consume the left parenthesis
     ++current;
 
     // Parse the identifiers inside the parentheses
     while (tokens[current].type != TokenType::RIGHT_PAREN) {
-        // Parse the identifier
-        auto* identifierNode = new ASTNode();
-        identifierNode->type = "Variable";
-        identifierNode->lexeme = tokens[current].lexeme;
-        identifierNode->line = tokens[current].position;
 
-        // Check if the identifier is valid
         if (tokens[current].type != TokenType::IDENTIFIER) {
-            std::cerr << "Expected variable\n";
+            std::cerr << "Expected variable identifier\n";
             exit(1);
         }
-
-        // Add the identifier as a child of the parameters node
-        node->children.push_back(identifierNode);
 
         // Consume the identifier
         ++current;
@@ -254,19 +239,19 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode
             ++current;
 
             // Parse the type
-            auto* typeNode = new ASTNode();
-            typeNode->type = "Type";
-            typeNode->lexeme = tokens[current].lexeme;
-            typeNode->line = tokens[current].position;
+            TokenType type = tokens[current].type;
 
-            // Add the type as a child of the identifier node
-            identifierNode->children.push_back(typeNode);
+            // Create the variable
+            if (type == TokenType::INT) {
+                Variable<int> variable;
+            } else {
+                std::cerr << "Unknown or unsupported type of variable\n";
+                exit(1);
+            }
 
             // Consume the type
             ++current;
         } else {
-            // Give error with information on what function and what variable name
-            std::cerr << "Expected colon after variable " << identifierNode->lexeme << " in function " << functionNode->lexeme << "\n";
             exit(1);
         }
 
@@ -284,53 +269,54 @@ ASTNode* parseParameters(const std::vector<Token>& tokens, int& current, ASTNode
         ++current;
 
         // Parse the return type
-        std::string returnType = tokens[current].lexeme;
+        TokenType returnType = stringToTokenType(tokens[current].lexeme);
 
-        // Create the Return node and add the return type as a child
-        ASTNode* returnNode = new ASTNode();
-        // Use the return node Type to indicate the return type
-        returnNode->type = "Return";
-        returnNode->lexeme = tokenTypeToString(tokens[current].type);
-        returnNode->line = tokens[current].position;
+        node->returnType = returnType;
 
-        // Add the Return node as a child of the Parameters node
-        node->children.push_back(returnNode);
+        // Consume the return type
+        ++current;
+    } else {
+        std::cerr << "Function has no return type.\n";
+        exit(1);
     }
-
-    ++current;
 
     return node;
 }
 
-ASTNode* parseReturn(const std::vector<Token>& tokens, int& current) {
-    // Return node
-    ASTNode* node = new ASTNode();
-    node->type = "Return";
-    node->line = tokens[current].position;
+VariableBase* parseReturn(const std::vector<Token>& tokens, int& current) {
 
-    // For now, we assume that the return statement is followed by one expression
-    // Parse the expression and add it as a child of the return node
-    // Not using parseExpression() because of custom paren handling
+    VariableBase* variable;
 
     // Consume the return token
     if (tokens[current].type == TokenType::RETURN) {
         ++current;
     } else {
-        std::cerr << "Expected return\n";
+        std::cerr << "Expected function return.\n";
         exit(1);
     }
 
     // Parse the expression
-    auto* expression = new ASTNode();
-    expression->type = tokenTypeToString(tokens[current].type);
-    expression->lexeme = tokens[current].lexeme;
-    expression->line = tokens[current].position;
+    std::vector<Token> expression_tokens;
+    while (tokens[current].type != TokenType::SEMICOLON) {
+        expression_tokens.push_back(tokens[current]);
+        ++current;
+    }
 
-    // Consume the expression
-    ++current;
+    Token result = calculateExpression(expression_tokens);
 
-    // Add the expression as a child of the return node
-    node->children.push_back(expression);
+    // Debug print the result of the expression
+    std::cout << "Result of expression: " << result.lexeme << "\n";
+
+    // Set the value of the variable
+    if (result.type == TokenType::INT) {
+        // Set the variable to be an <int>
+        variable = new Variable<int>();
+        dynamic_cast<Variable<int>*>(variable)->value = std::stoi(result.lexeme); // Improve this. Shouldn't need to dynamic cast
+        dynamic_cast<Variable<int>*>(variable)->type = result.type; // More secure than just setting TokenType::INT
+    } else {
+        std::cerr << "Unknown or unsupported type of variable\n";
+        exit(1);
+    }
 
     // Consume the semicolon
     if (tokens[current].type == TokenType::SEMICOLON) {
@@ -340,17 +326,15 @@ ASTNode* parseReturn(const std::vector<Token>& tokens, int& current) {
         exit(1);
     }
 
-    return node;
+    return variable;
 }
 
-ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNode* functionNode) {
+FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, FunctionNode* functionNode) {
     // Code to parse function body goes here
     // This will use recursive descent parsing to parse the statements inside the function body
 
     // Function body node
-    auto* node = new ASTNode();
-    node->type = "FunctionBody";
-    node->line = tokens[current].position;
+    auto* node = new FunctionBodyNode();
 
     // Consume the left brace
     if (tokens[current].type == TokenType::LEFT_BRACE) {
@@ -362,10 +346,12 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNo
 
     // Parse the statements inside the function body
     while (tokens[current].type != TokenType::RIGHT_BRACE) {
-        // Expection keywords
+        // Exception keywords
         if (tokens[current].type == TokenType::RETURN) {
             // Parse the return statement
-            ASTNode* returnNode = parseReturn(tokens, current);
+            VariableBase* returnNode = parseReturn(tokens, current);
+
+            functionNode->returnVariable = *returnNode;
 
             // Check that the return statement is the last statement in the function body
             if (tokens[current].type != TokenType::RIGHT_BRACE) {
@@ -373,27 +359,27 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNo
                 exit(1);
             }
 
-            // Check that the return statment type matches the function return type
+            // Check that the return statement type matches the function return type
             // TODO: Very ugly, fix later...
-            if (returnNode->children[0]->type != functionNode->children[0]->children.back()->lexeme) {
+            if (returnNode->type != functionNode->returnVariable.type) {
                 std::cerr << "Return type does not match function return type\n";
 
                 std::cerr << "\n";
                 printAST(functionNode, 0);
                 std::cerr << "\n";
 
-                std::cerr << "Return type: " << returnNode->children[0]->type << "\n";
-                std::cerr << "Function return type " << functionNode->children[0]->children.back()->lexeme << "\n";
+                std::cerr << "Return type: " << tokenTypeToString(returnNode->type) << "\n";
+                std::cerr << "Function return type " << tokenTypeToString(functionNode->returnVariable.type) << "\n";
                 exit(1);
             }
 
-            node->children.push_back(returnNode);
+            functionNode->returnVariable.type = returnNode->type;
             continue;
         }
 
         // Parse each statement and add it as a child of the function body node
-        ASTNode* statement = parseStatement(tokens, current);
-        node->children.push_back(statement);
+        ASTNodeBase* statement = parseStatement(tokens, current);
+        node->statements.push_back(statement);
     }
 
     // Consume the right brace
@@ -407,7 +393,7 @@ ASTNode* parseFunctionBody(const std::vector<Token>& tokens, int& current, ASTNo
     return node;
 }
 
-ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
+ASTNodeBase* parseStatement(const std::vector<Token>& tokens, int& current) {
     // Print type of current token
     std::cout << "Current token type: " << tokenTypeToString(tokens[current].type) << "\n";
 
@@ -456,28 +442,34 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
 
     // FN Token
     if (tokens[current].type == TokenType::FN) {
-        auto* node = new ASTNode();
-        node->type = "FunctionDeclaration";
-        node->lexeme = tokens[++current].lexeme;
-        node->line = tokens[current].position;
+        auto* node = new FunctionNode();
 
+        // Consume the FN token
+        ++current;
+
+        // Parse the function name
+        node->name = tokens[current].lexeme;
         ++current;
 
         // Parse the function parameters and print them
-        node->children.push_back(parseParameters(tokens, current, node));
+        // Why is there a * here?
+        node->parameters = *parseParameters(tokens, current);
 
         // Parse the function body
-        node->children.push_back(parseFunctionBody(tokens, current, node));
+        node->body = parseFunctionBody(tokens, current, node);
+
+        // Debug Print the name, return type, and parameters of the function
+        std::cout << "Function name: " << node->name << "\n";
+        std::cout << "Function return type: " << tokenTypeToString(node->returnVariable.type) << "\n";
+        std::cout << "Function parameters: ";
 
         return node;
     }
 
     // PRINT Token
     if (tokens[current].type == TokenType::PRINT) {
-        auto* node = new ASTNode();
-        node->type = "PrintStatement";
-        node->lexeme = "";
-        node->line = tokens[current].position;
+        auto* node = new PrintNode();
+
         ++current;
 
         // Parse the contents of the print statement
@@ -538,12 +530,14 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
         // Calculate the result of the print statement
         Token printCalculationResult = calculateExpression(printContents);
 
-        auto* printContentsNode = new ASTNode();
-        printContentsNode->type = tokenTypeToString(printCalculationResult.type);
-        printContentsNode->lexeme = printCalculationResult.lexeme;
-        printContentsNode->line = node->line;
-
-        node->children.push_back(printContentsNode);
+        switch(printCalculationResult.type) {
+            case TokenType::INT:
+                Variable<int> printResult;
+                printResult.type = TokenType::INT;
+                printResult.value = std::stoi(printCalculationResult.lexeme);
+                node->expression = &printResult;
+            // Add more types later.
+        }
 
         return node;
     }
@@ -572,21 +566,17 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
         return nullptr;
     }
 
-    // RETURN Token
-    if (tokens[current].type == TokenType::RETURN) {
-        return parseReturn(tokens, current);
-    }
-
     // IDENTIFIER Token
     if (tokens[current].type == TokenType::IDENTIFIER) {
         // Check if the previous token is a type token. This would mean that this is a variable declaration
         if(isTypeToken(tokens[current - 1].type)) {
-            return parseEquation(tokens, current);
+            auto* variable = new VariableNode();
+            variable->variable = parseEquation(tokens, current);
         }
 
         // If there is something else before the identifier, then it's a "variable update"
         if(!isTypeToken(tokens[current - 1].type)) {
-            return updateVariable(tokens, current);
+            updateVariable(tokens, current);
         }
 
         return nullptr;
@@ -603,21 +593,19 @@ ASTNode* parseStatement(const std::vector<Token>& tokens, int& current) {
     exit(1);
 }
 
-ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
+ASTTree* performParserAnalysis(const std::vector<Token>& tokens) {
     std::cout << "RUNNING: Starting Parser Analysis\n";
 
     // Start the timer
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    auto* root = new ASTNode();
-    root->type = "Program";
-    root->line = 1;
+    auto* root = new ASTTree();
 
     int current = 0;
     while (current < tokens.size()) {
-        ASTNode* statement = parseStatement(tokens, current);
+        ASTNodeBase* statement = parseStatement(tokens, current);
         if (statement != nullptr) {
-            root->children.push_back(statement);
+            root->statements.push_back(statement);
         }
         // If the statement is null, we just skip it
     }
@@ -642,7 +630,7 @@ ASTNode* performParserAnalysis(const std::vector<Token>& tokens) {
     return root;
 }
 
-void printAST(const ASTNode* node, int indent) {
+void printAST(ASTNodeBase* node, int indent) {
     if (node == nullptr) {
         return;
     }
@@ -656,21 +644,8 @@ void printAST(const ASTNode* node, int indent) {
 
     std::cout << indentation;
 
-    if (indent > 0) {
-        std::cout << branchLine;
-    }
-
-    std::cout << node->type << " - " << node->lexeme << " (Line: " << node->line << ")\n";
-
-    int numChildren = node->children.size();
-    for (int i = 0; i < numChildren; ++i) {
-        const ASTNode* child = node->children[i];
-        bool isLastChild = (i == numChildren - 1);
-
-        std::string childIndentation = indentation + (isLastChild ? "   " : cornerLine + "  ");
-
-        printAST(child, indent + 4);
-    }
+    // Print the node type
+    std::cout << std::string(typeid(*node).name()) << "\n";
 }
 
 void flushPrint() {

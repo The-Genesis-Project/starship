@@ -114,11 +114,11 @@ int main(int argc, char* argv[]) {
         }
 
         // Parsing analysis
-        ASTNode* ast = performParserAnalysis(tokens);
+        ASTTree* ast = performParserAnalysis(tokens);
 
         if (debugMode) {
             std::cout << "\n";
-            printAST(ast, 0);
+            printAST(reinterpret_cast<ASTNodeBase *>(ast), 0);
         }
 
         // Code generation
@@ -196,8 +196,13 @@ int main(int argc, char* argv[]) {
         }
 
         // Parsing analysis
-        ASTNode* ast = performParserAnalysis(tokens);
-        printAST(ast, 0);
+        ASTTree* ast = performParserAnalysis(tokens);
+
+        if (debugMode) {
+            std::cout << "\n";
+            printAST(reinterpret_cast<ASTNodeBase *>(ast), 0);
+        }
+
 
         return 0;
     }
