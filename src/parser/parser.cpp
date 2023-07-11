@@ -11,12 +11,13 @@
 std::vector<std::unique_ptr<VariableBase>> variables;
 
 // Global Functions
+std::vector<Function> functions;
 
 // Helper functions
 
 // Check if a string is in regulation with the variable naming rules
 bool validStringName(std::string& name) {
-if (name.size() > 0) {
+if (!name.empty()) {
         if (name[0] >= '0' && name[0] <= '9') {
             return false;
         } else {

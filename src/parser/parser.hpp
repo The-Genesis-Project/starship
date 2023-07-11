@@ -26,7 +26,7 @@ struct Variable : public VariableBase {
 struct Function {
     std::string name;
     TokenType returnType;
-
+    std::vector<VariableBase*> parameters;
 };
 
 ASTNode* performParserAnalysis(const std::vector<Token>& tokens);

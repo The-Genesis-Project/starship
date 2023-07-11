@@ -9,6 +9,7 @@ enum class TokenType {
     LEFT_PAREN, RIGHT_PAREN,
     LEFT_BRACE, RIGHT_BRACE,
     COMMA, SEMICOLON, COLON,
+    AT,
 
     // Expression tokens
     EQUAL, // =
@@ -19,7 +20,7 @@ enum class TokenType {
     ARROW, // ->
 
     // Keywords
-    FN, PRINT,
+    FN, PRINT, IMPORT,
 
     // Literals
     INT, // U64

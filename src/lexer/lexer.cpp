@@ -62,6 +62,10 @@ std::vector<Token> lex(const std::string& sourceCode) {
                 tokens.emplace_back(TokenType::SLASH, "/", line);
                 position++;
                 continue;
+            case '@':
+                tokens.emplace_back(TokenType::AT, "@", line);
+                position++;
+                continue;
 
             // Integers
             case '0': case '1': case '2': case '3': case '4':
@@ -140,7 +144,10 @@ std::vector<Token> lex(const std::string& sourceCode) {
                 type = TokenType::STRING;
             } else if (lexeme == "float") {
                 type = TokenType::FLOAT;
-            } else {
+            } else if (lexeme == "import") {
+                type = TokenType::IMPORT;
+            }
+            else {
                 type = TokenType::IDENTIFIER;
             }
             tokens.emplace_back(type, lexeme, line);
