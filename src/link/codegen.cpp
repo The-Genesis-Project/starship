@@ -144,7 +144,7 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* funct
 
     // Create the function contents
     // Loop through the statements and generate IR for each
-    if (functionNode->body->statements.size() >= 2 && functionNode->body->statements[0] != nullptr) {
+    if (functionNode->body->statements[0] != nullptr) {
         for (ASTNodeBase* statement : functionNode->body->statements) {
             if (statement == nullptr) {
                 if (debugMode) {

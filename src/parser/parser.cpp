@@ -393,7 +393,12 @@ FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& curre
 
         // Parse each statement and add it as a child of the function body node
         ASTNodeBase* statement = parseStatement(tokens, current);
-        node->statements.push_back(statement);
+
+        // Check for null because a lot of junk will be processed by other functions.
+        // And I just have it return nullptr if it's not used as a general statement
+        if (statement) {
+            node->statements.push_back(statement);
+        }
     }
 
     // Consume the right brace
@@ -607,12 +612,9 @@ ASTNodeBase* parseStatement(const std::vector<Token>& tokens, int& current) {
         if(isTypeToken(tokens[current - 1].type)) {
             auto* variable = new VariableNode();
             variable->variable = parseEquation(tokens, current);
-        }
-
-        // If there is something else before the identifier, then it's a "variable update"
-        if(!isTypeToken(tokens[current - 1].type)) {
+        } else {
             updateVariable(tokens, current);
-        }
+        }// If there is something else before the identifier, then it's a "variable update"
 
         return nullptr;
     }
