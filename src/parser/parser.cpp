@@ -321,6 +321,10 @@ VariableBase* parseReturn(const std::vector<Token>& tokens, int& current) {
         variable = new Variable<int>();
         dynamic_cast<Variable<int>*>(variable)->value = std::stoi(result.lexeme); // Improve this. Shouldn't need to dynamic cast
         dynamic_cast<Variable<int>*>(variable)->type = result.type; // More secure than just setting TokenType::INT
+    } else if (result.type == TokenType::STRING) {
+        variable = new Variable<std::string>();
+        dynamic_cast<Variable<std::string>*>(variable)->value = result.lexeme;
+        dynamic_cast<Variable<std::string>*>(variable)->type = result.type;
     } else {
         std::cerr << "Unknown or unsupported type of variable\n";
         exit(1);
@@ -359,7 +363,7 @@ FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& curre
             // Parse the return statement
             VariableBase* returnNode = parseReturn(tokens, current);
 
-            functionNode->returnVariable = *returnNode;
+            functionNode->returnVariable = returnNode;
             // For some reason the functionNode->returnVariable is drifting, so this sets it back to the correct value
             // TODO: Fix function return variable drifting
 
@@ -371,7 +375,7 @@ FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& curre
 
             // Check that the return statement type matches the function return type
             // TODO: Very ugly, fix later...
-            if (returnNode->type != functionNode->returnVariable.type) {
+            if (returnNode->type != functionNode->returnVariable->type) {
                 std::cerr << "Return type does not match function return type\n";
 
                 std::cerr << "\n";
@@ -379,11 +383,11 @@ FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& curre
                 std::cerr << "\n";
 
                 std::cerr << "Return type: " << tokenTypeToString(returnNode->type) << "\n";
-                std::cerr << "Function return type " << tokenTypeToString(functionNode->returnVariable.type) << "\n";
+                std::cerr << "Function return type " << tokenTypeToString(functionNode->returnVariable->type) << "\n";
                 exit(1);
             }
 
-            functionNode->returnVariable.type = returnNode->type;
+            functionNode->returnVariable->type = returnNode->type;
             continue;
         }
 
@@ -470,7 +474,7 @@ ASTNodeBase* parseStatement(const std::vector<Token>& tokens, int& current) {
 
         // Debug Print the name, return type, and parameters of the function
         std::cout << "Function name: " << node->name << "\n";
-        std::cout << "Function return type: " << tokenTypeToString(node->returnVariable.type) << "\n";
+        std::cout << "Function return type: " << tokenTypeToString(node->returnVariable->type) << "\n";
         std::cout << "Function parameters: " << "\n";
         for (auto& parameter : node->parameters.parameters) {
             std::cout << "Parameter name: " << parameter->name << "\n";
@@ -544,14 +548,31 @@ ASTNodeBase* parseStatement(const std::vector<Token>& tokens, int& current) {
         // Calculate the result of the print statement
         Token printCalculationResult = calculateExpression(printContents);
 
+        VariableBase* printVariable = nullptr;
+
         switch(printCalculationResult.type) {
-            case TokenType::INT:
-                Variable<int> printResult;
-                printResult.type = TokenType::INT;
-                printResult.value = std::stoi(printCalculationResult.lexeme);
-                node->expression = &printResult;
-            // Add more types later.
+            case TokenType::INT: {
+                Variable<int>* intVariable = new Variable<int>();
+                intVariable->type = TokenType::INT;
+                intVariable->value = std::stoi(printCalculationResult.lexeme);
+                printVariable = intVariable;
+                break;
+            }
+            case TokenType::STRING: {
+                Variable<std::string>* stringVariable = new Variable<std::string>();
+                stringVariable->type = TokenType::STRING;
+                stringVariable->value = printCalculationResult.lexeme;
+                printVariable = stringVariable;
+                break;
+            }
         }
+
+        if (!printVariable) {
+            std::cerr << "Something went wrong when calculating the print statement\n";
+            exit(1);
+        }
+
+        node->expression = printVariable;
 
         return node;
     }
@@ -659,7 +680,7 @@ void printAST(ASTNodeBase* node, int indent) {
     std::cout << indentation;
 
     // Print the node type
-    std::cout << std::string(typeid(*node).name()) << "\n";
+    std::cout << std::string(typeid(node).name()) << "\n";
 }
 
 void flushPrint() {

@@ -18,24 +18,20 @@ void CodeGenerator::generateIR(ASTTree* rootNode) {
     // Start the timer
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // Add function pass manager
-    // llvm::legacy::FunctionPassManager functionPassManager(&module);
-
-    // Add target data
-    // TODO: Fix up the FPM 
-    // functionPassManager.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
-
     // Visit the root node and generate IR code
     for (ASTNodeBase* child : rootNode->statements) {
-
-        // Print the type of child
         std::cout << "Visiting " << typeid(*child).name() << "\n";
 
-        /*
-        if (child->type == "FunctionDeclaration") {
-            generateFunctionDeclarationIR(child);
+        // These will be all the allowed top level statements
+
+        const char* typeName = typeid(*child).name();
+        if (strcmp(typeName, typeid(FunctionNode).name()) == 0) {
+            FunctionNode* functionNode = static_cast<FunctionNode*>(child);
+            generateFunctionDeclarationIR(functionNode);
+        } else {
+            std::cerr << "ERROR: Invalid node type \"" << typeName << "\"\n";
+            exit(1);
         }
-         */
 
         flushPrint();
     }
@@ -65,8 +61,7 @@ void CodeGenerator::generateIR(ASTTree* rootNode) {
 llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* functionNode) {
     std::vector<llvm::Type*> argTypes;
 
-    // Last child is the return type
-    TokenType functionReturnType = functionNode->returnVariable.type;
+    TokenType functionReturnType = functionNode->returnVariable->type;
 
     // Collect argument types
     // TODO: I don't like the double parameter thing.
@@ -115,15 +110,18 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* funct
 
     if (functionReturnType == TokenType::INT) {
         llvmReturnType = llvm::Type::getInt32Ty(context);
-    } /* else if (functionReturnType == TokenType::STRING) {
+    } else if (functionReturnType == TokenType::STRING) {
+        // Cast to string type
+        Variable<std::string>* stringVariable = dynamic_cast<Variable<std::string>*>(functionNode->returnVariable);
+
         // Parse the return size of the string to correctly get the type
-        std::cout << "String size: " << functionNode->children[1]->children.back()->children[0]->lexeme << "\n";
-        int stringSize = functionNode->children[1]->children.back()->children[0]->lexeme.length() + 1;
+        std::cout << "String size: " << stringVariable->value.size() << "\n";
+        int stringSize = stringVariable->value.size() + 1; // Figure out why this is +1
 
         llvmReturnType = llvm::Type::getInt8Ty(context);
         llvmReturnType = llvm::ArrayType::get(llvmReturnType, stringSize);
         llvmReturnType = llvm::PointerType::get(llvmReturnType, 0);
-    } */ else {
+    } else {
         std::cerr << "ERROR: Invalid return type \"" << tokenTypeToString(functionReturnType) << "\"\n";
         exit(1);
     }
@@ -146,7 +144,7 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* funct
 
     // Create the function contents
     // Loop through the statements and generate IR for each
-    if (functionNode->body->statements.size() >= 2 && functionNode->body->statements[1] != nullptr) {
+    if (functionNode->body->statements.size() >= 2 && functionNode->body->statements[0] != nullptr) {
         for (ASTNodeBase* statement : functionNode->body->statements) {
             if (statement == nullptr) {
                 if (debugMode) {
@@ -158,12 +156,10 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* funct
             // Debug print the statement type and the function name
             debugPrint("Visiting " + std::string(typeid(*statement).name()) + " in function " + functionNode->name + "\n");
 
-            /*
-            if (statement->type == "PrintStatement") {
+            if (strcmp(typeid(*statement).name(), typeid(PrintNode).name()) == 0) {
                 debugPrint("Generating print statement IR\n");
-                generatePrintStatementIR(statement);
+                generatePrintStatementIR(dynamic_cast<PrintNode *>(statement));
             }
-                */
         }
     }
    
@@ -171,28 +167,27 @@ llvm::Function* CodeGenerator::generateFunctionDeclarationIR(FunctionNode* funct
 
     // I don't know why this is needed, but it is, and it fixes the seg fault 
     // TODO: Figure out why and remove it
-   llvm::IRBuilder<> builder(entryBlock);
+    llvm::IRBuilder<> builder(entryBlock);
 
     // As before, switch through the return type to the llvm return type
     llvm::Type* llvmFunctionReturnType;
-    TokenType functionBottomReturnType = functionNode->returnVariable.type;
+    TokenType functionBottomReturnType = functionNode->returnVariable->type;
 
-    VariableBase returnVariable = functionNode->returnVariable;
+    VariableBase* returnVariable = functionNode->returnVariable;
     llvm::Value* returnPointer;
 
     // Create a switch statement to handle different return types
     if (functionBottomReturnType == TokenType::INT) {
-        Variable<int>* intReturnVariable = dynamic_cast<Variable<int>*>(&returnVariable);
+        Variable<int>* intReturnVariable = dynamic_cast<Variable<int>*>(returnVariable);
         if (intReturnVariable != nullptr) {
             int value = intReturnVariable->value;
             returnPointer = llvm::ConstantInt::get(context, llvm::APInt(32, value, true));
         }
-    }
-    /*else if (functionBottomReturnType == TokenType::STRING) {
-        llvm::Value* stringConstant = createStringConstant(returnValue);
+    } else if (functionBottomReturnType == TokenType::STRING) {
+        Variable<std::string>* stringReturnVariable = dynamic_cast<Variable<std::string>*>(returnVariable);
+        llvm::Value *stringConstant = createStringConstant(stringReturnVariable->value);
         returnPointer = stringConstant;
-    } */
-    else {
+    } else {
         // Handle other return types or error case
         std::cerr << "Unsupported return type: " << tokenTypeToString(functionBottomReturnType) << "\n";
         exit(1);
@@ -216,8 +211,12 @@ llvm::Value* CodeGenerator::generatePrintStatementIR(PrintNode* printNode) {
     switch (printValue->type) {
         case TokenType::INT: {
             processedValue = std::to_string(dynamic_cast<Variable<int>*>(printValue)->value);
+            break;
         }
-        // Add more later.
+        case TokenType::STRING: {
+            processedValue = dynamic_cast<Variable<std::string>*>(printValue)->value;
+            break;
+        }
     }
 
     // Check if processedValue is empty

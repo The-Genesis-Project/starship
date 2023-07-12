@@ -41,7 +41,7 @@ struct PrintNode : public ASTNodeBase {
 
 struct FunctionNode : public ASTNodeBase {
     std::string name;
-    VariableBase returnVariable; // This is the return type at the bottom of the function.
+    VariableBase* returnVariable; // This is the return type at the bottom of the function.
     ParameterNode parameters;
     FunctionBodyNode* body;
 };
