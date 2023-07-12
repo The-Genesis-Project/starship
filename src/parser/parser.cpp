@@ -233,6 +233,10 @@ ParameterNode* parseParameters(const std::vector<Token>& tokens, int& current) {
         // Consume the identifier
         ++current;
 
+        // Declare the variable
+        VariableBase* variable = new VariableBase();
+        variable->name = tokens[current - 1].lexeme;
+
         // If the next token is a colon, parse the type
         if (tokens[current].type == TokenType::COLON) {
             // Consume the colon
@@ -243,7 +247,10 @@ ParameterNode* parseParameters(const std::vector<Token>& tokens, int& current) {
 
             // Create the variable
             if (type == TokenType::INT) {
-                Variable<int> variable;
+                variable = new Variable<int>();
+                variable->type = TokenType::INT;
+
+                node->parameters.push_back(variable);
             } else {
                 std::cerr << "Unknown or unsupported type of variable\n";
                 exit(1);
@@ -252,6 +259,7 @@ ParameterNode* parseParameters(const std::vector<Token>& tokens, int& current) {
             // Consume the type
             ++current;
         } else {
+            std::cerr << "Expected colon after variable identifier for: " << variable->name << "\n";
             exit(1);
         }
 
@@ -352,6 +360,8 @@ FunctionBodyNode* parseFunctionBody(const std::vector<Token>& tokens, int& curre
             VariableBase* returnNode = parseReturn(tokens, current);
 
             functionNode->returnVariable = *returnNode;
+            // For some reason the functionNode->returnVariable is drifting, so this sets it back to the correct value
+            // TODO: Fix function return variable drifting
 
             // Check that the return statement is the last statement in the function body
             if (tokens[current].type != TokenType::RIGHT_BRACE) {
@@ -461,7 +471,11 @@ ASTNodeBase* parseStatement(const std::vector<Token>& tokens, int& current) {
         // Debug Print the name, return type, and parameters of the function
         std::cout << "Function name: " << node->name << "\n";
         std::cout << "Function return type: " << tokenTypeToString(node->returnVariable.type) << "\n";
-        std::cout << "Function parameters: ";
+        std::cout << "Function parameters: " << "\n";
+        for (auto& parameter : node->parameters.parameters) {
+            std::cout << "Parameter name: " << parameter->name << "\n";
+            std::cout << "Parameter type: " << tokenTypeToString(parameter->type) << "\n";
+        }
 
         return node;
     }
